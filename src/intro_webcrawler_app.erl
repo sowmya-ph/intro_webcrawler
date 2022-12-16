@@ -16,8 +16,24 @@
 -define(debug_log(X), file:write_file(?LOG_FILE, io_lib:format("~p~n", [X]), [append])).
 -endif.
 
+-record(webcrawler_words, {character, word}).
+-record(webcrawler_urls, {word, urls=[]}).
+
+install(Nodes) ->
+ok = mnesia:create_schema(Nodes),
+rpc:multicall(Nodes, application, start, [mnesia]),
+mnesia:create_table(intro_webcrawler_words,
+[{attributes, record_info(fields, webcrawler_words)},
+{disc_copies, Nodes}]),
+mnesia:create_table(webcrawler_urls,
+[{attributes, record_info(fields, webcrawler_urls)},
+{disc_copies, Nodes},
+{type, bag}]),
+rpc:multicall(Nodes, application, stop, [mnesia]).
+
 start(_StartType, _StartArgs) ->
     application:start(mochiweb),
+    mnesia:wait_for_tables([webcrawler_words, webcrawler_urls], 5000),
     intro_webcrawler_sup:start_link().
 
 crawl_all(SeedURL, Depth) ->
